@@ -1,0 +1,6 @@
+---
+Name: iqformbuilderpayments
+---
+IQnection\FormBuilder\Model\Submission:
+  extensions:
+    - 'IQnection\FormBuilderPayments\Extensions\SubmissionExtension'

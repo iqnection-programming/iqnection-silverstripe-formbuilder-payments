@@ -1,0 +1,23 @@
+{
+	"name": "iqnection-modules/formbuilder-payments",
+	"description": "Payment Extension for SilverStripe Form Builder",
+	"type": "silverstripe-vendormodule",
+	"keywords": ["iqnection","forms"],
+	"license": "BSD-3-Clause",
+	"authors": [
+		{
+			"name": "IQnection",
+            "homepage": "https://www.iqnection.com"
+		}
+	],
+	"require": {
+		"silverstripe/framework": "^4.0",
+		"iqnection-modules/formbuilder": "*",
+		"iqnection-modules/payment": "*"
+	},
+	"autoload": {
+		"psr-4": {
+			"IQnection\\FormBuilderPayments\\": "app/src/"
+		}
+	}
+}
