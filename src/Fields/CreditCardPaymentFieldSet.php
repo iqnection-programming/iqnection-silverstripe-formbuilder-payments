@@ -10,27 +10,27 @@ class CreditCardPaymentField extends Field
 {
 	private static $table_name = 'FormBuilderCreditCardPaymentField';
 	private static $singular_name = 'Credit Card Payment Field Set';
-	
+
 	private static $extensions = [
 		\IQnection\FormBuilderPayments\Extensions\PaymentField::class
 	];
-	
+
 	private static $db = [
 		'AllowedCardTypes' => 'Text',
 		'AuthOnly' => 'Boolean'
 	];
-	
+
 	private static $defaults = [
 		'AuthOnly' => false
 	];
-	
+
 	private static $allowed_card_types = [
 		'Visa',
 		'MasterCard',
 		'Discover',
 		'American Express'
 	];
-	
+
 	public function getCMSFields()
 	{
 		$fields = parent::getCMSFields();
@@ -42,7 +42,7 @@ class CreditCardPaymentField extends Field
 		);
 		return $fields;
 	}
-	
+
 	public function validate()
 	{
 		$result = parent::validate();
@@ -52,11 +52,11 @@ class CreditCardPaymentField extends Field
 		}
 		return $result;
 	}
-		
+
 	public function getBaseField(&$validator = null)
 	{
-		Requirements::javascript('iqnection-modules/formbuilder-payments:javascript/formbuilderpayments.js');
-		
+		Requirements::javascript('iqnection-modules/formbuilder-payments:javascript/formbuilder-payments.js');
+
 		$fieldGroup = Forms\FieldGroup::create($this->Name.'_group');
 		$fieldGroup->setTitle('');
 		$fieldGroup->setFieldHolderTemplate('SilverStripe\Forms\FieldGroup_DefaultFieldHolder');
@@ -65,15 +65,32 @@ class CreditCardPaymentField extends Field
 		$fieldGroup->push( Forms\DropdownField::create($this->getFrontendFieldName().'[CardType]','Credit Card')
 			->setSource(array_combine($allowedCardTypes,$allowedCardTypes))
 			->setEmptyString('-- Select --'));
-		$fieldGroup->push( Forms\FieldGroup::create('Cardholder\'s Name', [
+		$fieldGroup->push( Forms\FieldGroup::create('Name on Card', [
 			Forms\TextField::create($this->getFrontendFieldName().'[BillingFirstName]','')->setRightTitle('First Name')->addExtraClass('required'),
 			Forms\TextField::create($this->getFrontendFieldName().'[BillingLastName]','')->setRightTitle('Last Name')->addExtraClass('required')
 		])->addExtraClass('stacked'));
-		
-		$fieldGroup->push( Forms\TextField::create($this->getFrontendFieldName().'[BillingAddress1]','Cardholder\'s Street Address')->addExtraClass('required') );
-		$fieldGroup->push( Forms\TextField::create($this->getFrontendFieldName().'[BillingZip]','Zip/Postal Code')->addExtraClass('required') );
-		$fieldGroup->push( Forms\TextField::create($this->getFrontendFieldName().'[CardNumber]','Card Number')->addExtraClass('required') );
-		
+
+		$fieldGroup->push( Forms\FieldGroup::create('Billing Address', [
+			Forms\TextField::create($this->getFrontendFieldName().'[BillingAddress1]','')->setRightTitle('Street Address')->addExtraClass('required'),
+			Forms\TextField::create($this->getFrontendFieldName().'[BillingZip]','')->setRightTitle('Zip/Postal Code')->addExtraClass('required')
+		])->addExtraClass('stacked'));
+
+		$fieldGroup->push( Forms\FieldGroup::create('Credit Card', [
+			Forms\TextField::create($this->getFrontendFieldName().'[CardNumber]','')
+				->setRightTitle('Card Number')
+				->addExtraClass('required')
+				->setAttribute('placeholder','0000-0000-0000-0000')
+				->setAttribute('minlength',15)
+				->setAttribute('maxlength',19)
+				->setAttribute('pattern','^(\\d{4}[\\-\\s]?){4}|\\d{4}[\\-\\s]?\\d{6}[\\-\\s]?\\d{5}$'),
+			Forms\TextField::create($this->getFrontendFieldName().'[CCV]','')
+				->setRightTitle('CCV Code')
+				->addExtraClass('required')
+				->setAttribute('placeholder','000')
+				->setAttribute('minlength',3)
+				->setAttribute('maxlength',4)
+		])->addExtraClass('stacked'));
+
 		$months = [];
 		for($m=1; $m<=12; $m++)
 		{
@@ -98,14 +115,7 @@ class CreditCardPaymentField extends Field
 				->setEmptyString('-- Select --')
 				->setSource($years)
 		])->addExtraClass('stacked') );
-		
-		$fieldGroup->push( Forms\TextField::create($this->getFrontendFieldName().'[CCV]','CCV Code')->addExtraClass('required') );
-		
-		$fieldGroup->push( Forms\TextField::create($this->getFrontendFieldName().'[Amount]','Total Cost')
-			->setReadonly(true)
-			->setValue('$'.number_format($this->Amount,2))
-			->addExtraClass('readonly'));
-		
+
 		$validator->addRequiredField($this->getFrontendFieldName().'[CardType]');
 		$validator->addRequiredField($this->getFrontendFieldName().'[BillingFirstName]');
 		$validator->addRequiredField($this->getFrontendFieldName().'[BillingLastName]');
@@ -115,34 +125,35 @@ class CreditCardPaymentField extends Field
 		$validator->addRequiredField($this->getFrontendFieldName().'[ExpirationDate][Month]');
 		$validator->addRequiredField($this->getFrontendFieldName().'[ExpirationDate][Year]');
 		$validator->addRequiredField($this->getFrontendFieldName().'[CCV]');
-		
+
 		return $fieldGroup;
 	}
-	
+
 	public function prepareSubmittedValue($value)
 	{
 		$value = $this->preparePaymentData([$this->getFrontendFieldName() => $value], null);
 		$value['CCV'] = str_repeat('*', strlen($value['CCV']));
 		$value['CardNumber'] = '****'.substr($value['CardNumber'], -4, 4);
 		return implode("\n", [
-			'First Name: '.$value['BillingFirstName'], 
-			'Last Name: '.$value['BillingLastName'], 
-			'Address: '.$value['BillingAddress1'], 
-			'Zip: '.$value['BillingZip'], 
-			'Card Type: '.$value['CardType'], 
-			'Card Last 4: '.$value['CardNumber'], 
+			'First Name: '.$value['BillingFirstName'],
+			'Last Name: '.$value['BillingLastName'],
+			'Address: '.$value['BillingAddress1'],
+			'Zip: '.$value['BillingZip'],
+			'Card Type: '.$value['CardType'],
+			'Card Last 4: '.$value['CardNumber'],
 			'Expiration: '.$value['ExpirationDate'],
 			'CCV: '.$value['CCV'],
 			'Type: '.($paymentData['AuthOnly'] ? 'Authorized Only' : 'Authorized & Captured'),
-			'Amount: '.$value['Amount'],
+			'Amount: $'.number_format($value['Amount'], 2),
 		]);
 	}
-	
+
 	public function preparePaymentData($data, $form)
 	{
 		$paymentData = $data[$this->getFrontendFieldName()];
 		$paymentData['ExpirationDate'] = $paymentData['ExpirationDate']['Year'].'-'.$paymentData['ExpirationDate']['Month'];
 		$paymentData['AuthOnly'] = array_key_exists('AuthOnly',$paymentData) ? $paymentData['AuthOnly'] : $this->AuthOnly;
+		$this->extend('updatePaymentData',$paymentData,$form);
 		return $paymentData;
 	}
 }

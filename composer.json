@@ -15,6 +15,11 @@
 		"iqnection-modules/formbuilder": "*",
 		"iqnection-modules/payment": "*"
 	},
+	"extra": {
+		"expose": [
+			"javascript"
+		]
+	},
 	"autoload": {
 		"psr-4": {
 			"IQnection\\FormBuilderPayments\\": "app/src/"
