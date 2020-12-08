@@ -10,6 +10,7 @@ use SilverStripe\ORM\ValidationResult;
 use IQnection\FormBuilderPayments\Model\SubmissionPaymentFieldValue;
 use IQnection\FormBuilder\Fields\MoneyField;
 use SilverStripe\Forms;
+use SilverStripe\View\Requirements;
 
 class PaymentField extends DataExtension
 {
@@ -83,6 +84,13 @@ class PaymentField extends DataExtension
 		]));
 	}
 
+	public function updateConditionOptionsField(&$field)
+	{
+		$options = ['Is Empty' => 'Is Zero', 'Has Value' => 'Is Greater Then Zero'];
+		$field = Forms\OptionsetField::create('State','Field State')
+			->setSource($options);
+	}
+
 	public function onBeforeWrite()
 	{
 		if ($this->owner->AmountType == self::AMOUNT_TYPE_USER)
@@ -91,8 +99,52 @@ class PaymentField extends DataExtension
 		}
 	}
 
+	public function getPaymentFields(&$fields, &$validator = null) { }
+
+	public function getPaymentFields_jQuerySelector()
+	{
+		if (!$this->owner->_paymentFieldsjQuerySelector)
+		{
+			$paymentFields = $this->owner->getPaymentFields();
+			$this->owner->_paymentFieldsjQuerySelector = '#'.$this->owner->FormBuilder()->getFormHTMLID().'_'.$paymentFields->ID();
+		}
+		return $this->owner->_paymentFieldsjQuerySelector;
+	}
+
+	public function getAmountField_jQuerySelector()
+	{
+		return '[name="'.$this->owner->getFrontendFieldName().'[Amount]"]';
+	}
+
 	public function updateBaseField(&$fields, &$validator)
 	{
+		Requirements::javascript('iqnection-modules/formbuilder-payments:javascript/formbuilder-payments.js');
+
+		$wrapperFieldGroup = $fields;
+		if (!($wrapperFieldGroup instanceof Forms\CompositeField))
+		{
+			$wrapperFieldGroup = Forms\FieldGroup::create($this->Name.'_groupWrapper')
+				->setTitle('')
+				->setFieldHolderTemplate('SilverStripe\Forms\FieldGroup_DefaultFieldHolder')
+				->addExtraClass('full-width-field');
+
+			if ($fields instanceof Forms\FormField)
+			{
+				$wrapperFieldGroup->push($fields);
+			}
+			$fields = $wrapperFieldGroup;
+		}
+		$fields = Forms\FieldGroup::create($this->Name.'_groupWrapper')
+			->setTitle('')
+			->setFieldHolderTemplate('SilverStripe\Forms\FieldGroup_DefaultFieldHolder')
+			->addExtraClass('full-width-field');
+
+		if ($paymentField_group = $this->owner->getPaymentFields())
+		{
+			$paymentField_group->setAttribute('data-cc-fields', $this->ID);
+			$fields->push($paymentField_group);
+		}
+
 		if ($this->owner->AmountType == self::AMOUNT_TYPE_FIXED)
 		{
 			$amountField = Forms\CurrencyField::create($this->owner->getFrontendFieldName().'[Amount]','Amount');
@@ -117,6 +169,7 @@ class PaymentField extends DataExtension
 			}
 			$this->owner->Amount = null;
 		}
+
 		$fields->push($amountField);
 	}
 
@@ -150,19 +203,19 @@ class PaymentField extends DataExtension
 		if (floatval($paymentRecord->Amount) > 0.00)
 		{
 			$paymentRecord = $paymentRecord->Process($paymentData, $paymentRecord);
+
+			// some gateways might not know if the payment was successful immediately
+			// only redirect back if we know the payment has failed
+			if (in_array($paymentRecord->Status, [Payment::STATUS_FAILED, Payment::STATUS_DECLINED]))
+			{
+				$result = ValidationResult::create();
+				$result->addError('There was an error processing your payment: '.$paymentRecord->Message);
+				throw ValidationException::create($result);
+			}
 		}
 		else
 		{
-			$paymentRecord->Message = 'Cannot process charge for zero or less';
-		}
-
-		// some gateways might not know if the payment was successful immediately
-		// only redirect back if we know the payment has failed
-		if (in_array($paymentRecord->Status, [Payment::STATUS_FAILED, Payment::STATUS_DECLINED]))
-		{
-			$result = ValidationResult::create();
-			$result->addError('There was an error processing your payment: '.$paymentRecord->Message);
-			throw ValidationException::create($result);
+			$paymentRecord->Status == Payment::STATUS_SUCCESS;
 		}
 		$paymentRecord->write();
 		$data[$this->owner->getFrontendFieldName()]['PaymentID'] = $paymentRecord->ID;
@@ -192,13 +245,6 @@ class PaymentField extends DataExtension
 			}
 		}
 		return $rules;
-	}
-
-	public function getAmountjQuerySelector()
-	{
-		$selector = '[name="'.$this->owner->getFrontendFieldName().'[Amount]"]';
-		$this->owner->extend('updateAmountjQuerySelector', $selector);
-		return $selector;
 	}
 }
 

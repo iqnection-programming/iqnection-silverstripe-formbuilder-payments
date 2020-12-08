@@ -5,6 +5,7 @@ namespace IQnection\FormBuilderPayments\Actions;
 use IQnection\FormBuilder\Model\FieldAction;
 use IQnection\FormBuilder\Fields\MoneyField;
 use SilverStripe\Forms;
+use IQnection\FormBuilderPayments\Extensions\PaymentField;
 
 class AdjustAmountFieldAction extends FieldAction
 {
@@ -28,7 +29,7 @@ class AdjustAmountFieldAction extends FieldAction
 	];
 
 	private static $allowed_field_types = [
-		\IQnection\FormBuilderPayments\Extensions\PaymentField::class
+		PaymentField::class
 	];
 
 	public function getCMSFields()
@@ -85,10 +86,10 @@ class AdjustAmountFieldAction extends FieldAction
 	{
 		$actionData = parent::getActionData();
 		$actionData['action']['callback'] = 'actionAdjustPaymentAmount';
-		$actionData['action']['selector'] = $this->Parent()->getAmountjQuerySelector();
+		$actionData['action']['selector'] = $this->Parent()->getAmountField_jQuerySelector();
 		$actionData['action']['id'] = $this->ID;
 		$actionData['action']['amount'] = [
-			'default' => $this->Parent()->Amount,
+			'_default' => $this->Parent()->Amount,
 			'adjust' => $this->Amount,
 			'adjust_type' => $this->AdjustmentType,
 			'adjust_field' => $this->UserAmountField()->getjQuerySelector()

@@ -5,6 +5,7 @@ namespace IQnection\FormBuilderPayments\Fields;
 use IQnection\FormBuilder\Model\Field;
 use SilverStripe\Forms;
 use SilverStripe\View\Requirements;
+use IQnection\FormBuilderPayments\Extensions\PaymentField;
 
 class CreditCardPaymentField extends Field
 {
@@ -12,7 +13,7 @@ class CreditCardPaymentField extends Field
 	private static $singular_name = 'Credit Card Payment Field Set';
 
 	private static $extensions = [
-		\IQnection\FormBuilderPayments\Extensions\PaymentField::class
+		PaymentField::class
 	];
 
 	private static $db = [
@@ -34,6 +35,7 @@ class CreditCardPaymentField extends Field
 	public function getCMSFields()
 	{
 		$fields = parent::getCMSFields();
+		$fields->removeByName(['Description']);
 		$fields->replaceField('AllowedCardTypes', Forms\CheckboxsetField::create('AllowedCardTypes','Allowed Card Types')
 			->setSource(array_combine($this->Config()->get('allowed_card_types'),$this->Config()->get('allowed_card_types')))
 		);
@@ -53,14 +55,18 @@ class CreditCardPaymentField extends Field
 		return $result;
 	}
 
-	public function getBaseField(&$validator = null)
+	public function getPaymentFields()
 	{
-		Requirements::javascript('iqnection-modules/formbuilder-payments:javascript/formbuilder-payments.js');
+		$fieldGroup = Forms\FieldGroup::create($this->Name.'_group')
+			->setTitle('')
+			->setFieldHolderTemplate('SilverStripe\Forms\FieldGroup_DefaultFieldHolder')
+			->addExtraClass('full-width-field');
 
-		$fieldGroup = Forms\FieldGroup::create($this->Name.'_group');
 		$fieldGroup->setTitle('');
+
 		$fieldGroup->setFieldHolderTemplate('SilverStripe\Forms\FieldGroup_DefaultFieldHolder');
 		$fieldGroup->addExtraClass('full-width-field');
+
 		$allowedCardTypes = json_decode($this->AllowedCardTypes);
 		$fieldGroup->push( Forms\DropdownField::create($this->getFrontendFieldName().'[CardType]','Credit Card')
 			->setSource(array_combine($allowedCardTypes,$allowedCardTypes))
@@ -116,16 +122,6 @@ class CreditCardPaymentField extends Field
 				->setSource($years)
 		])->addExtraClass('stacked') );
 
-		$validator->addRequiredField($this->getFrontendFieldName().'[CardType]');
-		$validator->addRequiredField($this->getFrontendFieldName().'[BillingFirstName]');
-		$validator->addRequiredField($this->getFrontendFieldName().'[BillingLastName]');
-		$validator->addRequiredField($this->getFrontendFieldName().'[BillingAddress1]');
-		$validator->addRequiredField($this->getFrontendFieldName().'[BillingZip]');
-		$validator->addRequiredField($this->getFrontendFieldName().'[CardNumber]');
-		$validator->addRequiredField($this->getFrontendFieldName().'[ExpirationDate][Month]');
-		$validator->addRequiredField($this->getFrontendFieldName().'[ExpirationDate][Year]');
-		$validator->addRequiredField($this->getFrontendFieldName().'[CCV]');
-
 		return $fieldGroup;
 	}
 
@@ -134,6 +130,7 @@ class CreditCardPaymentField extends Field
 		$value = $this->preparePaymentData([$this->getFrontendFieldName() => $value], null);
 		$value['CCV'] = str_repeat('*', strlen($value['CCV']));
 		$value['CardNumber'] = '****'.substr($value['CardNumber'], -4, 4);
+		$amount = floatval($value['Amount'] ?: 0);
 		return implode("\n", [
 			'First Name: '.$value['BillingFirstName'],
 			'Last Name: '.$value['BillingLastName'],
@@ -144,7 +141,7 @@ class CreditCardPaymentField extends Field
 			'Expiration: '.$value['ExpirationDate'],
 			'CCV: '.$value['CCV'],
 			'Type: '.($paymentData['AuthOnly'] ? 'Authorized Only' : 'Authorized & Captured'),
-			'Amount: $'.number_format($value['Amount'], 2),
+			'Amount: $'.number_format($amount, 2),
 		]);
 	}
 
@@ -155,6 +152,59 @@ class CreditCardPaymentField extends Field
 		$paymentData['AuthOnly'] = array_key_exists('AuthOnly',$paymentData) ? $paymentData['AuthOnly'] : $this->AuthOnly;
 		$this->extend('updatePaymentData',$paymentData,$form);
 		return $paymentData;
+	}
+
+	public function updateFrontEndValidator(&$validator, $formData = [])
+	{
+		$isRequired = true;
+		if (count($formData))
+		{
+			$hasSubmittedAmount = ceil(preg_replace('/[^0-9\.]/', '', $formData[$this->getFrontendFieldName().'[Amount]']));
+			if ($this->owner->AmountType == PaymentField::AMOUNT_TYPE_FIXED)
+			{
+				$isRequired = !!$hasSubmittedAmount;
+			}
+		}
+		if ($isRequired)
+		{
+			$validator->addRequiredField($this->getFrontendFieldName().'[CardType]');
+			$validator->addRequiredField($this->getFrontendFieldName().'[BillingFirstName]');
+			$validator->addRequiredField($this->getFrontendFieldName().'[BillingLastName]');
+			$validator->addRequiredField($this->getFrontendFieldName().'[BillingAddress1]');
+			$validator->addRequiredField($this->getFrontendFieldName().'[BillingZip]');
+			$validator->addRequiredField($this->getFrontendFieldName().'[CardNumber]');
+			$validator->addRequiredField($this->getFrontendFieldName().'[ExpirationDate][Month]');
+			$validator->addRequiredField($this->getFrontendFieldName().'[ExpirationDate][Year]');
+			$validator->addRequiredField($this->getFrontendFieldName().'[CCV]');
+		}
+	}
+
+	public function getOnLoadFieldActions($onLoadCondition = null)
+	{
+		$actions = parent::getOnLoadFieldActions($onLoadCondition);
+
+		if ($this->AmountType == PaymentField::AMOUNT_TYPE_FIXED)
+		{
+			$conditions[] = [
+				'selector' => $this->getAmountField_jQuerySelector(),
+				'state' => 'Is Empty',
+				'stateCallback' => 'stateIsEmpty',
+				'selections' => [],
+			];
+			$actions[] = [
+				'id' => $this->ID.'.2',
+				'name' => 'Field: '.$this->Name,
+				'action' => [
+					'type' => 'Hide CC Fields When No Amount',
+					'selector' => $this->getPaymentFields_jQuerySelector(),
+					'fieldType' => $this->singular_name(),
+					'callback' => 'actionHideField',
+				],
+				'conditions' => $conditions,
+				'conditionsHash' => 'paymentAmountZero'
+			];
+		}
+		return $actions;
 	}
 }
 
