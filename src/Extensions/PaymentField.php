@@ -84,11 +84,10 @@ class PaymentField extends DataExtension
 		]));
 	}
 
-	public function updateConditionOptionsField(&$field)
+	public function updateConditionOptions(&$field)
 	{
-		$options = ['Is Empty' => 'Is Zero', 'Has Value' => 'Is Greater Then Zero'];
-		$field = Forms\OptionsetField::create('State','Field State')
-			->setSource($options);
+		$field->push(Forms\SelectionGroup_Item::create('Is Empty', null, 'Is Zero'));
+		$field->push(Forms\SelectionGroup_Item::create('Has Value', null, 'Is Greater Then Zero'));
 	}
 
 	public function onBeforeWrite()
@@ -118,7 +117,7 @@ class PaymentField extends DataExtension
 
 	public function updateBaseField(&$fields, &$validator)
 	{
-		Requirements::javascript('iqnection-modules/formbuilder-payments:javascript/formbuilder-payments.js');
+		Requirements::javascript('iqnection-modules/formbuilder-payments:client/javascript/formbuilder-payments.js');
 
 		$wrapperFieldGroup = $fields;
 		if (!($wrapperFieldGroup instanceof Forms\CompositeField))
@@ -149,7 +148,7 @@ class PaymentField extends DataExtension
 		{
 			$amountField = Forms\CurrencyField::create($this->owner->getFrontendFieldName().'[Amount]','Amount');
 			$amountField->setReadonly(true)
-				->setValue('$'.number_format($this->Amount,2))
+				->setValue('$'.number_format($this->owner->Amount,2))
 				->addExtraClass('readonly');
 		}
 		elseif ($this->owner->AmountType == self::AMOUNT_TYPE_USER)
@@ -191,7 +190,7 @@ class PaymentField extends DataExtension
 		return $amount;
 	}
 
-	public function processFormData(&$data, $form, $request, &$response)
+	public function processFormData(&$data, &$form, &$controller)
 	{
 		if ( (!$paymentClass = $this->owner->Config()->get('payment_class')) || (!class_exists($paymentClass)) )
 		{
