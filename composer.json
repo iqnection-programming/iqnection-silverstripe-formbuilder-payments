@@ -13,7 +13,7 @@
 	"require": {
 		"silverstripe/framework": "^4.0",
 		"iqnection-modules/formbuilder": "*",
-		"iqnection-modules/payment": "^2.0.1"
+		"iqnection-modules/payment": "^2.1"
 	},
 	"extra": {
 		"expose": [
