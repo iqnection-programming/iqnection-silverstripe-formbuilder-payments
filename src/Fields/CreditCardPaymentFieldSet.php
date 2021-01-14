@@ -6,6 +6,7 @@ use IQnection\FormBuilder\Model\Field;
 use SilverStripe\Forms;
 use SilverStripe\View\Requirements;
 use IQnection\FormBuilderPayments\Extensions\PaymentField;
+use IQnection\Payment\Payment;
 
 class CreditCardPaymentField extends Field
 {
@@ -55,7 +56,7 @@ class CreditCardPaymentField extends Field
 		return $result;
 	}
 
-	public function getPaymentFields()
+	public function getPaymentFields(&$validator, $defaults = null)
 	{
 		$fieldGroup = Forms\FieldGroup::create($this->Name.'_group')
 			->setTitle('')
@@ -88,15 +89,19 @@ class CreditCardPaymentField extends Field
 				->setAttribute('placeholder','0000-0000-0000-0000')
 				->setAttribute('minlength',15)
 				->setAttribute('maxlength',19)
+				->setValue('')
 				->setAttribute('pattern','^(\\d{4}[\\-\\s]?){4}|\\d{4}[\\-\\s]?\\d{6}[\\-\\s]?\\d{5}$'),
 			Forms\TextField::create($this->getFrontendFieldName().'[CCV]','')
 				->setRightTitle('CCV Code')
 				->addExtraClass('required')
 				->setAttribute('placeholder','000')
+				->setValue('')
 				->setAttribute('minlength',3)
 				->setAttribute('maxlength',4)
 		])->addExtraClass('stacked'));
 
+		unset($defaults[$this->getFrontendFieldName().'[CardNumber]']);
+		unset($defaults[$this->getFrontendFieldName().'[CCV]']);
 		$months = [];
 		for($m=1; $m<=12; $m++)
 		{
@@ -131,6 +136,14 @@ class CreditCardPaymentField extends Field
 		$value['CCV'] = str_repeat('*', strlen($value['CCV']));
 		$value['CardNumber'] = '****'.substr($value['CardNumber'], -4, 4);
 		$amount = floatval($value['Amount'] ?: 0);
+		$value['TransactionId'] = '(none)';
+		$value['AuthorizationCode'] = '(none)';
+		if ( ($paymentID = $value['PaymentID']) && ($Payment = Payment::get()->byId($paymentID)) )
+		{
+			$value['TransactionId'] = (string) $Payment->TransactionId;
+			$value['AuthorizationCode'] = (string) $Payment->AuthorizationCode;
+		}
+
 		return implode("\n", [
 			'First Name: '.$value['BillingFirstName'],
 			'Last Name: '.$value['BillingLastName'],
@@ -140,8 +153,10 @@ class CreditCardPaymentField extends Field
 			'Card Last 4: '.$value['CardNumber'],
 			'Expiration: '.$value['ExpirationDate'],
 			'CCV: '.$value['CCV'],
-			'Type: '.($paymentData['AuthOnly'] ? 'Authorized Only' : 'Authorized & Captured'),
+			'Type: '.($value['AuthOnly'] ? 'Authorized Only' : 'Authorized & Captured'),
 			'Amount: $'.number_format($amount, 2),
+			'Authorization Code: '.$value['AuthorizationCode'],
+			'Transaction ID: '.$value['TransactionId']
 		]);
 	}
 
@@ -156,13 +171,13 @@ class CreditCardPaymentField extends Field
 
 	public function updateFrontEndValidator(&$validator, $formData = [])
 	{
-		$isRequired = true;
+		$isRequired = !$this->AllowZeroPayment;
 		if (count($formData))
 		{
 			$hasSubmittedAmount = ceil(preg_replace('/[^0-9\.]/', '', $formData[$this->getFrontendFieldName().'[Amount]']));
-			if ($this->owner->AmountType == PaymentField::AMOUNT_TYPE_FIXED)
+			if (!$this->AllowZeroPayment)
 			{
-				$isRequired = !!$hasSubmittedAmount;
+				$isRequired = true;
 			}
 		}
 		if ($isRequired)
@@ -183,12 +198,19 @@ class CreditCardPaymentField extends Field
 	{
 		$actions = parent::getOnLoadFieldActions($onLoadCondition);
 
-		if ($this->AmountType == PaymentField::AMOUNT_TYPE_FIXED)
+		if ($this->AllowZeroPayment)
 		{
+			// hide the payment fields if no payment is required
 			$conditions[] = [
 				'selector' => $this->getAmountField_jQuerySelector(),
-				'state' => 'Is Empty',
-				'stateCallback' => 'stateIsEmpty',
+				'state' => 'Is Zero',
+				'stateCallback' => 'stateMatchAny',
+				'config' => [
+					'matchValue' => [
+						'0',
+						'0.00'
+					]
+				],
 				'selections' => [],
 			];
 			$actions[] = [

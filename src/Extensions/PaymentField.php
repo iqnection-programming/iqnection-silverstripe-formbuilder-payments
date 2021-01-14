@@ -23,6 +23,7 @@ class PaymentField extends DataExtension
 		'Label' => 'Varchar(255)',
 		'AmountType' => "Enum('Fixed Amount,User Defined','Fixed Amount')",
 		'Amount' => 'Currency',
+		'AllowZeroPayment' => 'Boolean',
 		'Description' => 'Varchar(255)',
 		'MinAmount' => 'Currency',
 		'MaxAmount' => 'Currency',
@@ -66,6 +67,7 @@ class PaymentField extends DataExtension
 			'MinAmount',
 			'MaxAmount',
 		]);
+		$fields->addFieldToTab('Root.Main', Forms\CheckboxField::create('AllowZeroPayment','Allow Submission if Amount is Zero?'));
 		$fields->addFieldToTab('Root.Main', Forms\SelectionGroup::create('AmountType',[
 			self::AMOUNT_TYPE_FIXED => Forms\SelectionGroup_Item::create(
 				self::AMOUNT_TYPE_FIXED, [
@@ -98,7 +100,7 @@ class PaymentField extends DataExtension
 		}
 	}
 
-	public function getPaymentFields(&$fields, &$validator = null) { }
+	public function getPaymentFields(&$validator = null, $defaults = null) { }
 
 	public function getPaymentFields_jQuerySelector()
 	{
@@ -115,9 +117,10 @@ class PaymentField extends DataExtension
 		return '[name="'.$this->owner->getFrontendFieldName().'[Amount]"]';
 	}
 
-	public function updateBaseField(&$fields, &$validator)
+	public function updateBaseField(&$fields, &$validator = null, $defaults = null)
 	{
 		Requirements::javascript('iqnection-modules/formbuilder-payments:client/javascript/formbuilder-payments.js');
+		Requirements::css('iqnection-modules/formbuilder-payments:client/css/formbuilder-payments.css');
 
 		$wrapperFieldGroup = $fields;
 		if (!($wrapperFieldGroup instanceof Forms\CompositeField))
@@ -138,25 +141,34 @@ class PaymentField extends DataExtension
 			->setFieldHolderTemplate('SilverStripe\Forms\FieldGroup_DefaultFieldHolder')
 			->addExtraClass('full-width-field');
 
-		if ($paymentField_group = $this->owner->getPaymentFields())
+		if ($paymentField_group = $this->owner->getPaymentFields($validator, $defaults = null))
 		{
 			$paymentField_group->setAttribute('data-cc-fields', $this->ID);
 			$fields->push($paymentField_group);
 		}
 
+		if ($amountField = $this->owner->getAmountBaseField())
+		{
+			$fields->push($amountField);
+		}
+	}
+
+	public function getAmountBaseField()
+	{
 		if ($this->owner->AmountType == self::AMOUNT_TYPE_FIXED)
 		{
-			$amountField = Forms\CurrencyField::create($this->owner->getFrontendFieldName().'[Amount]','Amount');
+			$amountField = Forms\TextField::create($this->owner->getFrontendFieldName().'[Amount]','Amount');
 			$amountField->setReadonly(true)
-				->setValue('$'.number_format($this->owner->Amount,2))
+				->setValue(number_format($this->owner->Amount,2))
+				->addExtraClass('payment-amount-field payment-amount-field--fixed')
 				->addExtraClass('readonly');
 		}
 		elseif ($this->owner->AmountType == self::AMOUNT_TYPE_USER)
 		{
-			$amountField = Forms\NumericField::create($this->owner->getFrontendFieldName().'[Amount]','Amount')
-				->setHTML5(true)
-				->setAttribute('placeholder','$0.00')
-				->setAttribute('pattern','^\\$?[\\d,]*(\.\\d{,2})?$')
+			$amountField = Forms\TextField::create($this->owner->getFrontendFieldName().'[Amount]','Amount')
+				->setAttribute('placeholder','0.00')
+				->setAttribute('pattern','^[\\d,]*(\.\\d{,2})?$')
+				->addExtraClass('payment-amount-field payment-amount-field--open')
 				->setValue('');
 			if (ceil($this->owner->MinAmount))
 			{
@@ -168,8 +180,8 @@ class PaymentField extends DataExtension
 			}
 			$this->owner->Amount = null;
 		}
-
-		$fields->push($amountField);
+		$this->owner->extend('updateAmountBaseField', $amountField);
+		return $amountField;
 	}
 
 	public function calculateAmount($data)
@@ -199,7 +211,7 @@ class PaymentField extends DataExtension
 		$paymentRecord = Injector::inst()->create($paymentClass);
 		$paymentData = $this->owner->preparePaymentData($data, $form);
 		$paymentRecord->Amount = $this->owner->calculateAmount($data);
-		if (floatval($paymentRecord->Amount) > 0.00)
+		if (ceil($paymentRecord->Amount) > 0)
 		{
 			$paymentRecord = $paymentRecord->Process($paymentData, $paymentRecord);
 

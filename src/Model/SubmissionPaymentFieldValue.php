@@ -13,18 +13,7 @@ class SubmissionPaymentFieldValue extends SubmissionFieldValue
 	private static $has_one = [
 		'Payment' => Payment::class
 	];
-	
-	public function getCMSFields()
-	{
-		$fields = parent::getCMSFields();
 
-		if ($this->Payment()->Exists())
-		{
-			$fields->addFieldToTab('Root.PaymentDetails', Forms\LiteralField::create('<div style="width:100%;overflow:scroll;"><pre><xmp>'.print_r(json_encode($this->Payment()->Response, JSON_PRETTY_PRINT),1).'</xmp></pre></div>'));
-		}
-		return $fields;
-	}
-	
 	public function onAfterWrite()
 	{
 		parent::onAfterWrite();

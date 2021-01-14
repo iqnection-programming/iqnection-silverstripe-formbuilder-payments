@@ -24,13 +24,6 @@ class SetAmountFieldAction extends FieldAction
 		PaymentField::class
 	];
 
-	public function getCMSFields()
-	{
-		$fields = parent::getCMSFields();
-//		$fields->addFieldToTab('Root.Main', Forms\LiteralField::create('_disclaimer','<p>This action will override all other charge adjustments when the conditions are met</p>'));
-		return $fields;
-	}
-
 	public function getActionData()
 	{
 		$actionData = parent::getActionData();

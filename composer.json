@@ -16,7 +16,7 @@
 		"iqnection-modules/payment": "^2.1"
 	},
 	"prefer-stable": true,
-    	"minimum-stability": "dev",
+    "minimum-stability": "dev",
 	"extra": {
 		"expose": [
 			"client"
