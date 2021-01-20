@@ -6,6 +6,7 @@ use IQnection\FormBuilder\Model\FieldAction;
 use IQnection\FormBuilder\Fields\MoneyField;
 use SilverStripe\Forms;
 use IQnection\FormBuilderPayments\Extensions\PaymentField;
+use IQnection\FormBuilder\FormBuilder;
 
 class AdjustAmountFieldAction extends FieldAction
 {
@@ -30,6 +31,10 @@ class AdjustAmountFieldAction extends FieldAction
 
 	private static $allowed_field_types = [
 		PaymentField::class
+	];
+
+	private static $form_builder_has_one_duplicates = [
+		'UserAmountField'
 	];
 
 	public function getCMSFields()

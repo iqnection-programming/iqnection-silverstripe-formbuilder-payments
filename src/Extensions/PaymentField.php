@@ -86,7 +86,7 @@ class PaymentField extends DataExtension
 		]));
 	}
 
-	public function updateConditionOptions(&$field)
+	public function updateConditionOptions(&$field, $fieldAction = null, $fieldName = null)
 	{
 		$field->push(Forms\SelectionGroup_Item::create('Is Empty', null, 'Is Zero'));
 		$field->push(Forms\SelectionGroup_Item::create('Has Value', null, 'Is Greater Then Zero'));
@@ -119,9 +119,6 @@ class PaymentField extends DataExtension
 
 	public function updateBaseField(&$fields, &$validator = null, $defaults = null)
 	{
-		Requirements::javascript('iqnection-modules/formbuilder-payments:client/javascript/formbuilder-payments.js');
-		Requirements::css('iqnection-modules/formbuilder-payments:client/css/formbuilder-payments.css');
-
 		$wrapperFieldGroup = $fields;
 		if (!($wrapperFieldGroup instanceof Forms\CompositeField))
 		{
@@ -211,7 +208,11 @@ class PaymentField extends DataExtension
 		$paymentRecord = Injector::inst()->create($paymentClass);
 		$paymentData = $this->owner->preparePaymentData($data, $form);
 		$paymentRecord->Amount = $this->owner->calculateAmount($data);
-		if (ceil($paymentRecord->Amount) > 0)
+		if ( (ceil($paymentRecord->Amount) == 0) && ($this->owner->AllowZeroPayment) )
+		{
+			$paymentRecord->Status == Payment::STATUS_SUCCESS;
+		}
+		else
 		{
 			$paymentRecord = $paymentRecord->Process($paymentData, $paymentRecord);
 
@@ -223,10 +224,6 @@ class PaymentField extends DataExtension
 				$result->addError('There was an error processing your payment: '.$paymentRecord->Message);
 				throw ValidationException::create($result);
 			}
-		}
-		else
-		{
-			$paymentRecord->Status == Payment::STATUS_SUCCESS;
 		}
 		$paymentRecord->write();
 		$data[$this->owner->getFrontendFieldName()]['PaymentID'] = $paymentRecord->ID;

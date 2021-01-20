@@ -7,6 +7,8 @@ use SilverStripe\Forms;
 use SilverStripe\View\Requirements;
 use IQnection\FormBuilderPayments\Extensions\PaymentField;
 use IQnection\Payment\Payment;
+use IQnection\FormBuilder\Fields\EmailField;
+use IQnection\FormBuilder\Fields\TextField;
 
 class CreditCardPaymentField extends Field
 {
@@ -22,6 +24,11 @@ class CreditCardPaymentField extends Field
 		'AuthOnly' => 'Boolean'
 	];
 
+	private static $has_one = [
+		'EmailField' => EmailField::class,
+		'PhoneField' => TextField::class
+	];
+
 	private static $defaults = [
 		'AuthOnly' => false
 	];
@@ -33,17 +40,84 @@ class CreditCardPaymentField extends Field
 		'American Express'
 	];
 
+	private static $form_builder_has_one_duplicates = [
+		'EmailField',
+		'PhoneField'
+	];
+
 	public function getCMSFields()
 	{
 		$fields = parent::getCMSFields();
-		$fields->removeByName(['Description']);
+		$fields->removeByName([
+			'Description',
+			'EmailFieldID',
+			'PhoneFieldID'
+		]);
 		$fields->replaceField('AllowedCardTypes', Forms\CheckboxsetField::create('AllowedCardTypes','Allowed Card Types')
 			->setSource(array_combine($this->Config()->get('allowed_card_types'),$this->Config()->get('allowed_card_types')))
 		);
 		$fields->replaceField('AuthOnly',Forms\OptionsetField::create('AuthOnly','Transaction Type')
 			->setSource([0 => 'Authorize and Capture', 1 => 'Authorize Only'])
 		);
+		$fields->insertAfter('Label', Forms\FieldGroup::create('Additional Billing Fields', [
+			Forms\DropdownField::create('EmailFieldID','Billing Email Field')
+				->setSource($this->getAvailableEmailFields()->map('ID','Name'))
+				->setEmptyString('None'),
+			Forms\DropdownField::create('PhoneFieldID','Billing Phone Number Field')
+				->setSource($this->getAvailablePhoneFields()->map('ID','Name'))
+				->setEmptyString('None')
+		]));
+
 		return $fields;
+	}
+
+	public function getAvailableEmailFields()
+	{
+		$emailFieldIDs = [0];
+		foreach($this->FormBuilder()->DataFields() as $dataField)
+		{
+			if ($dataField instanceof EmailField)
+			{
+				$emailFieldIDs[] = $dataField->ID;
+			}
+		}
+		return EmailField::get()->Filter('ID',$emailFieldIDs);
+	}
+
+	public function getAvailablePhoneFields()
+	{
+		$fieldIDs = [0];
+		foreach($this->FormBuilder()->DataFields() as $dataField)
+		{
+			if ( ($dataField instanceof TextField) && ($dataField->Format == 'validatePhone') )
+			{
+				$fieldIDs[] = $dataField->ID;
+			}
+		}
+		$possibleFields = TextField::get()->Filter('ID',$fieldIDs);
+		if (!$possibleFields->Count())
+		{
+			$possibleFields = $this->FormBuilder()->DataFields()->Filter('Name:PartialMatch', 'Phone');
+		}
+		return $possibleFields;
+	}
+
+	public function BillingEmailField()
+	{
+		if ($this->EmailField()->Exists())
+		{
+			return $this->EmailField();
+		}
+		return $this->getAvailableEmailFields()->First();
+	}
+
+	public function BillingPhoneField()
+	{
+		if ($this->PhoneField()->Exists())
+		{
+			return $this->PhoneField();
+		}
+		return $this->getAvailablePhoneFields()->First();
 	}
 
 	public function validate()
@@ -130,12 +204,12 @@ class CreditCardPaymentField extends Field
 		return $fieldGroup;
 	}
 
-	public function prepareSubmittedValue($value)
+	public function prepareSubmittedValue($value, $formData = [])
 	{
-		$value = $this->preparePaymentData([$this->getFrontendFieldName() => $value], null);
+		$value = $this->preparePaymentData($formData, null);
 		$value['CCV'] = str_repeat('*', strlen($value['CCV']));
 		$value['CardNumber'] = '****'.substr($value['CardNumber'], -4, 4);
-		$amount = floatval($value['Amount'] ?: 0);
+		$amount = $value['Amount'];
 		$value['TransactionId'] = '(none)';
 		$value['AuthorizationCode'] = '(none)';
 		if ( ($paymentID = $value['PaymentID']) && ($Payment = Payment::get()->byId($paymentID)) )
@@ -149,6 +223,8 @@ class CreditCardPaymentField extends Field
 			'Last Name: '.$value['BillingLastName'],
 			'Address: '.$value['BillingAddress1'],
 			'Zip: '.$value['BillingZip'],
+			'Phone: '.$value['BillingPhone'],
+			'Email: '.$value['BillingEmail'],
 			'Card Type: '.$value['CardType'],
 			'Card Last 4: '.$value['CardNumber'],
 			'Expiration: '.$value['ExpirationDate'],
@@ -165,6 +241,14 @@ class CreditCardPaymentField extends Field
 		$paymentData = $data[$this->getFrontendFieldName()];
 		$paymentData['ExpirationDate'] = $paymentData['ExpirationDate']['Year'].'-'.$paymentData['ExpirationDate']['Month'];
 		$paymentData['AuthOnly'] = array_key_exists('AuthOnly',$paymentData) ? $paymentData['AuthOnly'] : $this->AuthOnly;
+		if ( ($billingEmailField = $this->BillingEmailField()) && ($billingEmailField->Exists()) )
+		{
+			$paymentData['BillingEmail'] = $data[$billingEmailField->getFrontendFieldName()];
+		}
+		if ( ($billingPhoneField = $this->BillingPhoneField()) && ($billingPhoneField->Exists()) )
+		{
+			$paymentData['BillingPhone'] = $data[$billingPhoneField->getFrontendFieldName()];
+		}
 		$this->extend('updatePaymentData',$paymentData,$form);
 		return $paymentData;
 	}
