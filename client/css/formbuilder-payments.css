@@ -1,0 +1,10 @@
+/** Form Builder Payments **/
+
+.form-builder .payment-amount-field .middleColumn 			{ position: relative; }
+.form-builder .payment-amount-field .middleColumn:before	{ display:block; position:absolute; content: '$'; top: 1px; left: 1px; height:41px; text-align:center; line-height:43px; font-size:1em; }
+.form-builder .payment-amount-field--open .middleColumn:before	{ background:#f1f1f1; width:40px; }
+.form-builder .payment-amount-field--fixed .middleColumn:before	{ width:20px; }
+.form-builder .payment-amount-field input 					{ margin-bottom:0; }
+.form-builder .payment-amount-field--open input 			{ text-indent: 40px; }
+.form-builder .payment-amount-field--fixed input 			{ text-indent: 10px; }
+

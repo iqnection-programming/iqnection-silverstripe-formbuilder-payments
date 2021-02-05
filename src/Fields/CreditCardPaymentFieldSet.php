@@ -130,7 +130,7 @@ class CreditCardPaymentField extends Field
 		return $result;
 	}
 
-	public function getPaymentFields(&$validator, $defaults = null)
+	public function getPaymentFields($defaults = null)
 	{
 		$fieldGroup = Forms\FieldGroup::create($this->Name.'_group')
 			->setTitle('')
@@ -145,6 +145,7 @@ class CreditCardPaymentField extends Field
 		$allowedCardTypes = json_decode($this->AllowedCardTypes);
 		$fieldGroup->push( Forms\DropdownField::create($this->getFrontendFieldName().'[CardType]','Credit Card')
 			->setSource(array_combine($allowedCardTypes,$allowedCardTypes))
+			->addExtraClass('required')
 			->setEmptyString('-- Select --'));
 		$fieldGroup->push( Forms\FieldGroup::create('Name on Card', [
 			Forms\TextField::create($this->getFrontendFieldName().'[BillingFirstName]','')->setRightTitle('First Name')->addExtraClass('required'),

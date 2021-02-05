@@ -100,7 +100,7 @@ class PaymentField extends DataExtension
 		}
 	}
 
-	public function getPaymentFields(&$validator = null, $defaults = null) { }
+	public function getPaymentFields($defaults = null) { }
 
 	public function getPaymentFields_jQuerySelector()
 	{
@@ -138,7 +138,7 @@ class PaymentField extends DataExtension
 			->setFieldHolderTemplate('SilverStripe\Forms\FieldGroup_DefaultFieldHolder')
 			->addExtraClass('full-width-field');
 
-		if ($paymentField_group = $this->owner->getPaymentFields($validator, $defaults = null))
+		if ($paymentField_group = $this->owner->getPaymentFields($defaults = null))
 		{
 			$paymentField_group->setAttribute('data-cc-fields', $this->ID);
 			$fields->push($paymentField_group);
