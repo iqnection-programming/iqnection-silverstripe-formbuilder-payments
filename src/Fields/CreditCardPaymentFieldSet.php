@@ -210,7 +210,7 @@ class CreditCardPaymentField extends Field
 		$value = $this->preparePaymentData($formData, null);
 		$value['CCV'] = str_repeat('*', strlen($value['CCV']));
 		$value['CardNumber'] = '****'.substr($value['CardNumber'], -4, 4);
-		$amount = $value['Amount'];
+		$amount = $this->calculateAmount($formData);//$value['Amount'];
 		$value['TransactionId'] = '(none)';
 		$value['AuthorizationCode'] = '(none)';
 		if ( ($paymentID = $value['PaymentID']) && ($Payment = Payment::get()->byId($paymentID)) )
@@ -312,6 +312,17 @@ class CreditCardPaymentField extends Field
 			];
 		}
 		return $actions;
+	}
+
+	public function createSubmissionFieldValue($value, $formData = [])
+	{
+		$submissionFieldValue = parent::createSubmissionFieldValue($value, $formData);
+		// remove sensitive information
+		$value['CCV'] = str_repeat('*', strlen($value['CCV']));
+		$value['CardNumber'] = '****'.substr($value['CardNumber'], -4, 4);
+
+		$submissionFieldValue->RawValue = serialize($value);
+		return $submissionFieldValue;
 	}
 }
 

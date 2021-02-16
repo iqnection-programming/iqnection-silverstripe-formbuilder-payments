@@ -27,6 +27,7 @@ class PaymentField extends DataExtension
 		'Description' => 'Varchar(255)',
 		'MinAmount' => 'Currency',
 		'MaxAmount' => 'Currency',
+		'AdjustmentsLog' => 'Text',
 	];
 
 	private static $defaults = [
@@ -188,14 +189,20 @@ class PaymentField extends DataExtension
 		{
 			$amount = floatval($data[$this->owner->getFrontendFieldName()]['Amount']);
 		}
+		$adjustments = [
+			[
+				'baseAmount' => $amount
+			]
+		];
 		foreach($this->owner->FieldActions() as $fieldAction)
 		{
 			if ($fieldAction->hasMethod('AdjustAmount'))
 			{
-				$amount = $fieldAction->AdjustAmount($amount, $data);
+				$amount = $fieldAction->AdjustAmount($amount, $data, $adjustments);
 			}
 		}
-		$this->owner->extend('updateAmount', $amount);
+		$this->owner->extend('updateAmount', $amount, $adjustments);
+		$this->owner->AdjustmentsLog = serialize($adjustments);
 		return $amount;
 	}
 
@@ -207,7 +214,8 @@ class PaymentField extends DataExtension
 		}
 		$paymentRecord = Injector::inst()->create($paymentClass);
 		$paymentData = $this->owner->preparePaymentData($data, $form);
-		$paymentRecord->Amount = $this->owner->calculateAmount($data);
+		$paymentData['Amount'] = $this->owner->calculateAmount($data);
+		$paymentRecord->Amount = $paymentData['Amount'];
 		if ( (ceil($paymentRecord->Amount) == 0) && ($this->owner->AllowZeroPayment) )
 		{
 			$paymentRecord->Status == Payment::STATUS_SUCCESS;

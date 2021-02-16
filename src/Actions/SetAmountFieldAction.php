@@ -47,23 +47,36 @@ class SetAmountFieldAction extends FieldAction
 		return $singular_name;
 	}
 
-	public function AdjustAmount($amount, $formData)
+	public function AdjustAmount($amount, $formData, &$adjustments)
 	{
-		if ($this->testConditions($formData))
+		$previousAmount = $amount;
+		$adjustment = 0;
+		$hidden = $this->Parent()->isHidden($formData);
+		if ( ($this->testConditions($formData)) && (!$hidden) )
 		{
 			if ($this->AdjustmentType == self::ADJUSTMENT_TYPE_FIXED)
 			{
-				$amount += $this->Amount;
+				$adjustment = $this->Amount;
 			}
 			elseif ($this->AdjustmentType == self::ADJUSTMENT_TYPE_USER)
 			{
 				$linkedFieldName = $this->UserAmountField();
 				if ($linkedFieldName->Exists())
 				{
-					$amount += floatval($formData[$linkedFieldName->getFrontendFieldName()]);
+					$adjustment = floatval($formData[$linkedFieldName->getFrontendFieldName()]);
 				}
 			}
 		}
+		$amount = $previousAmount + $adjustment;
+		$adjustments[] = [
+			'hidden' => $hidden,
+			'actionID' => $this->ID,
+			'type' => $this->AdjustmentType,
+			'previousAmount' => $previousAmount,
+			'adjustment' => $adjustment,
+			'newAmount' => $amount,
+			'explain' => (string) $this->Explain()
+		];
 		return $amount;
 	}
 }
