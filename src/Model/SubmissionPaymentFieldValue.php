@@ -9,7 +9,11 @@ use SilverStripe\Forms;
 class SubmissionPaymentFieldValue extends SubmissionFieldValue
 {
 	private static $table_name = 'FormBuilderSubmissionPaymentFieldValue';
-	
+
+	private static $db = [
+		'AdjustmentsLog' => 'Text',
+	];
+
 	private static $has_one = [
 		'Payment' => Payment::class
 	];
@@ -23,5 +27,10 @@ class SubmissionPaymentFieldValue extends SubmissionFieldValue
 			$this->Payment()->PaidObjectType = $this->getClassName();
 			$this->Payment()->write();
 		}
+	}
+
+	public function DebugInfo()
+	{
+		return unserialize($this->AdjustmentsLog);
 	}
 }

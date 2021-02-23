@@ -27,7 +27,6 @@ class PaymentField extends DataExtension
 		'Description' => 'Varchar(255)',
 		'MinAmount' => 'Currency',
 		'MaxAmount' => 'Currency',
-		'AdjustmentsLog' => 'Text',
 	];
 
 	private static $defaults = [
@@ -182,6 +181,7 @@ class PaymentField extends DataExtension
 		return $amountField;
 	}
 
+	protected static $_adjustmentsLog;
 	public function calculateAmount($data)
 	{
 		$amount = $this->owner->Amount;
@@ -202,7 +202,8 @@ class PaymentField extends DataExtension
 			}
 		}
 		$this->owner->extend('updateAmount', $amount, $adjustments);
-		$this->owner->AdjustmentsLog = serialize($adjustments);
+		self::$_adjustmentsLog = $adjustments;
+
 		return $amount;
 	}
 
@@ -244,6 +245,7 @@ class PaymentField extends DataExtension
 		{
 			$submissionFieldValue->PaymentID = $paymentID;
 		}
+		$submissionFieldValue->AdjustmentsLog = serialize(self::$_adjustmentsLog);
 	}
 
 	public function updateFieldJsValidation(&$rules)
