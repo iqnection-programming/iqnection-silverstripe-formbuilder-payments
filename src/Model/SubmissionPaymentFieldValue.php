@@ -12,6 +12,7 @@ class SubmissionPaymentFieldValue extends SubmissionFieldValue
 
 	private static $db = [
 		'AdjustmentsLog' => 'Text',
+		'ChargeAmount' => 'Currency'
 	];
 
 	private static $has_one = [
@@ -31,6 +32,9 @@ class SubmissionPaymentFieldValue extends SubmissionFieldValue
 
 	public function DebugInfo()
 	{
-		return unserialize($this->AdjustmentsLog);
+		return [
+			'charge amount' => $this->ChargeAmount,
+			'data' => unserialize($this->AdjustmentsLog)
+		];
 	}
 }

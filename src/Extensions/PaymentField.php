@@ -182,29 +182,36 @@ class PaymentField extends DataExtension
 	}
 
 	protected static $_adjustmentsLog;
+	protected static $_chargeAmount;
 	public function calculateAmount($data)
 	{
-		$amount = $this->owner->Amount;
-		if ($this->owner->AmountType == self::AMOUNT_TYPE_USER)
+		if (is_null(self::$_chargeAmount))
 		{
-			$amount = floatval($data[$this->owner->getFrontendFieldName()]['Amount']);
-		}
-		$adjustments = [
-			[
-				'baseAmount' => $amount
-			]
-		];
-		foreach($this->owner->FieldActions() as $fieldAction)
-		{
-			if ($fieldAction->hasMethod('AdjustAmount'))
+			$amount = $this->owner->Amount;
+			if ($this->owner->AmountType == self::AMOUNT_TYPE_USER)
 			{
-				$amount = $fieldAction->AdjustAmount($amount, $data, $adjustments);
+				$amount = floatval($data[$this->owner->getFrontendFieldName()]['Amount']);
 			}
+			$adjustments = [
+				[
+					'baseAmount' => $amount
+				]
+			];
+			foreach($this->owner->FieldActions() as $fieldAction)
+			{
+				$actionAdjustments = [];
+				if ($fieldAction->hasMethod('AdjustAmount'))
+				{
+					$amount = $fieldAction->AdjustAmount($amount, $data, $actionAdjustments);
+				}
+				$adjustments[$fieldAction->ID] = $actionAdjustments;
+			}
+			$this->owner->extend('updateAmount', $amount, $adjustments);
+			self::$_adjustmentsLog = $adjustments;
+			self::$_chargeAmount = $amount;
 		}
-		$this->owner->extend('updateAmount', $amount, $adjustments);
-		self::$_adjustmentsLog = $adjustments;
 
-		return $amount;
+		return self::$_chargeAmount;
 	}
 
 	public function processFormData(&$data, &$form, &$controller)
@@ -245,6 +252,7 @@ class PaymentField extends DataExtension
 		{
 			$submissionFieldValue->PaymentID = $paymentID;
 		}
+		$submissionFieldValue->ChargeAmount = self::$_chargeAmount;
 		$submissionFieldValue->AdjustmentsLog = serialize(self::$_adjustmentsLog);
 	}
 
