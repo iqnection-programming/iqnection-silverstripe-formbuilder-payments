@@ -7,3 +7,7 @@ IQnection\FormBuilder\FormBuilder:
 IQnection\FormBuilder\Model\Submission:
   extensions:
     - 'IQnection\FormBuilderPayments\Extensions\SubmissionExtension'
+IQnection\FormBuilder\Admin\ModelAdmin:
+  managed_models:
+    IQnection\Payment\CreditCardPayment:
+      title: Payments
